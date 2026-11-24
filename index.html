@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b090d" />
+    <link rel="icon" href="data:," />
+    <title>Nazara — see the view before you book</title>
+  </head>
+  <body>
+    <div id="app">
+      <section id="stage">
+        <canvas id="c" aria-label="3D view of the cinema hall"></canvas>
+        <div class="topbar">
+          <button id="modeBtn" class="chip-btn" type="button"></button>
+          <div id="viewPill" class="pill"><i></i><span></span></div>
+        </div>
+        <div id="hint" class="hint"></div>
+      </section>
+
+      <aside id="panel">
+        <header class="brand">
+          <div>
+            <h1>Nazara</h1>
+            <p>See the view before you book</p>
+          </div>
+          <label class="hall-pick">
+            <span class="sr">Hall</span>
+            <select id="hallSel"></select>
+          </label>
+        </header>
+
+        <div class="seat-card">
+          <div>
+            <div id="verdict" class="verdict"></div>
+            <h2 id="seatName"></h2>
+            <p id="seatClass" class="muted"></p>
+          </div>
+          <div class="score"><b id="score"></b><span>view score</span></div>
+        </div>
+
+        <div id="stats" class="stats"></div>
+
+        <div class="tools">
+          <button id="heatBtn" class="toggle" type="button" aria-pressed="false">
+            <i></i> Colour seats by view quality
+          </button>
+        </div>
+
+        <h3>Best available</h3>
+        <div id="best" class="best"></div>
+
+        <h3>Pick a seat</h3>
+        <div class="map-wrap">
+          <div id="map" class="map"></div>
+        </div>
+        <div id="legend" class="legend"></div>
+
+        <p id="blurb" class="blurb"></p>
+        <p class="note">
+          Sample halls for the prototype. Layouts are typical of each format, not measurements of a real cinema.
+        </p>
+
+        <div class="bookbar">
+          <button id="bookBtn" class="book" type="button"></button>
+        </div>
+      </aside>
+    </div>
+    <div id="toast" class="toast" role="status"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
