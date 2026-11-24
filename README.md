@@ -12,6 +12,12 @@ See the view from your seat before you book. A working prototype of a 3D seat-pr
 - Colours the whole hall by view quality with one switch.
 - Three sample halls: a mall multiplex (Classic / Prime / Recliner), an old single screen (Front Stalls / Rear Stalls / Balcony), and a large-format giant screen.
 
+## The film on the screen
+
+The screen plays the trailer for "Sintel" (© Blender Foundation, durian.blender.org), an open film released under CC BY 3.0, so it is free to show with credit. The light it throws on the seats follows the picture.
+
+"Play your own clip" swaps in any video file from your device. The file stays in your browser and is not uploaded. To change the default, replace `public/media/sintel-trailer.mp4` and the credit line in `src/main.js`.
+
 ## Run it
 
 ```bash

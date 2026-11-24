@@ -127,6 +127,13 @@ export class HallScene {
 
     this.hallPos = new THREE.Vector3();
     this.hallTarget = new THREE.Vector3();
+    this.video = null;
+    this.videoReady = false;
+    this._probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    this._probe.canvas.width = this._probe.canvas.height = 8;
+    this._probeAt = 0;
+    this._glowColor = new THREE.Color('#ffd2a6');
+    this._glowLevel = 1.5;
     this.raycaster = new THREE.Raycaster();
     this.group = null;
 
@@ -173,7 +180,10 @@ export class HallScene {
     const { width: W, height: H, bottom: B } = def.screen;
     const screen = new THREE.Mesh(
       new THREE.PlaneGeometry(W, H),
-      new THREE.MeshBasicMaterial({ map: filmFrame(W / H), toneMapped: false })
+      new THREE.MeshBasicMaterial({
+        map: this.videoReady ? this._videoTexture(W / H) : filmFrame(W / H),
+        toneMapped: false,
+      })
     );
     screen.position.set(0, B + H / 2, 0);
     g.add(screen);
@@ -262,6 +272,8 @@ export class HallScene {
     glow.position.set(0, B + H / 2, -1);
     glow.target.position.set(0, bounds.topY * 0.5, bounds.depth);
     g.add(glow, glow.target);
+    this.glow = glow;
+    this.screen = screen;
     const fill = new THREE.DirectionalLight('#c9b6ff', 0.9);
     fill.position.set(bounds.width * 0.4, bounds.height + 6, bounds.depth + 8);
     fill.target.position.set(0, 0, bounds.depth * 0.4);
@@ -304,6 +316,81 @@ export class HallScene {
       this.seatMesh.setColorAt(i, c);
     });
     this.seatMesh.instanceColor.needsUpdate = true;
+  }
+
+  // ---------- film ----------
+
+  /** Play a video file on the cinema screen. Falls back to the painted frame if it cannot load. */
+  setFilm(src, startAt = 0) {
+    this.video?.pause();
+    const v = document.createElement('video');
+    v.src = src;
+    v.loop = false; // looped by hand so it can skip opening title cards
+    v.muted = this.video ? this.video.muted : true;
+    v.playsInline = true;
+    v.preload = 'auto';
+    this.video = v;
+    this.videoReady = false;
+    v.addEventListener('ended', () => {
+      v.currentTime = startAt;
+      v.play().catch(() => {});
+    });
+    return new Promise((resolve) => {
+      v.addEventListener('loadeddata', () => {
+        if (this.video !== v) return;
+        if (startAt) v.currentTime = startAt;
+        this.videoReady = true;
+        v.play().catch(() => {});
+        if (this.screen) {
+          const { width: W, height: H } = this.hall.def.screen;
+          this.screen.material.map?.dispose();
+          this.screen.material.map = this._videoTexture(W / H);
+          this.screen.material.needsUpdate = true;
+        }
+        resolve(true);
+      }, { once: true });
+      v.addEventListener('error', () => resolve(false), { once: true });
+    });
+  }
+
+  setMuted(muted) {
+    if (!this.video) return;
+    this.video.muted = muted;
+    if (this.video.paused) this.video.play().catch(() => {});
+  }
+
+  // Crop the film to fill the screen shape, like a projectionist would.
+  _videoTexture(aspect) {
+    const v = this.video;
+    const t = new THREE.VideoTexture(v);
+    t.colorSpace = THREE.SRGBColorSpace;
+    const va = v.videoWidth / v.videoHeight || aspect;
+    if (va > aspect) {
+      t.repeat.set(aspect / va, 1);
+      t.offset.set((1 - aspect / va) / 2, 0);
+    } else {
+      t.repeat.set(1, va / aspect);
+      t.offset.set(0, (1 - va / aspect) / 2);
+    }
+    return t;
+  }
+
+  // The light the screen throws on the room follows what is playing.
+  _sampleGlow(now) {
+    if (!this.videoReady || now - this._probeAt < 110) return;
+    this._probeAt = now;
+    try {
+      this._probe.drawImage(this.video, 0, 0, 8, 8);
+      const d = this._probe.getImageData(0, 0, 8, 8).data;
+      let r = 0, g = 0, b = 0;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+      const n = d.length / 4 * 255;
+      r /= n; g /= n; b /= n;
+      const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      const peak = Math.max(r, g, b, 0.001);
+      this._glowColor.setRGB(0.35 + 0.65 * r / peak, 0.35 + 0.65 * g / peak, 0.35 + 0.65 * b / peak);
+      this._glowLevel = 0.6 + 3.0 * Math.sqrt(luma);
+    } catch { /* frame not readable yet */ }
   }
 
   // ---------- public controls ----------
@@ -406,6 +493,9 @@ export class HallScene {
       this.camera.rotation.set(this.look.pitch + this.look.pitchOff, this.look.yaw + this.look.yawOff, 0, 'YXZ');
     }
     if (!this.hall) return;
+    this._sampleGlow(now);
+    this.glow.color.lerp(this._glowColor, Math.min(1, dt / 180));
+    this.glow.intensity += (this._glowLevel - this.glow.intensity) * Math.min(1, dt / 180);
     const want = this.mode === 'hall' ? 1 : 0;
     this.house += (want - this.house) * Math.min(1, dt / 350);
     this.ambient.intensity = 0.5 + 1.1 * this.house;

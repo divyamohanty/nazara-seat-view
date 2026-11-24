@@ -204,6 +204,44 @@ $('#bookBtn').addEventListener('click', () => {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
 });
 
+// ---------- film on the screen ----------
+
+const DEFAULT_FILM = {
+  src: '/media/sintel-trailer.mp4',
+  startAt: 12.5, // skip the black title cards
+  credit: 'Now playing: "Sintel" trailer. © Blender Foundation, durian.blender.org, CC BY 3.0.',
+};
+
+async function playFilm(src, credit, startAt = 0) {
+  const ok = await scene.setFilm(src, startAt);
+  $('#nowPlaying').textContent = ok ? credit : 'That file would not play here. Try an MP4.';
+  return ok;
+}
+
+$('#soundBtn').addEventListener('click', (e) => {
+  const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+  e.currentTarget.setAttribute('aria-pressed', on);
+  e.currentTarget.textContent = on ? 'Sound on' : 'Sound off';
+  scene.setMuted(!on);
+});
+
+let clipUrl;
+$('#clipIn').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  if (await playFilm(url, `Now playing: ${file.name} (from your device, not uploaded anywhere).`)) {
+    if (clipUrl) URL.revokeObjectURL(clipUrl);
+    clipUrl = url;
+  } else {
+    URL.revokeObjectURL(url);
+    playFilm(DEFAULT_FILM.src, DEFAULT_FILM.credit, DEFAULT_FILM.startAt);
+  }
+  e.target.value = '';
+});
+
+playFilm(DEFAULT_FILM.src, DEFAULT_FILM.credit, DEFAULT_FILM.startAt);
+
 // Deep link for sharing a view: ?hall=single&seat=K12&view=hall
 const params = new URLSearchParams(location.search);
 const startHall = Math.max(0, HALLS.findIndex((h) => h.id === params.get('hall')));
