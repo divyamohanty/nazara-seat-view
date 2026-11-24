@@ -30,14 +30,9 @@
         <div id="hint" class="hint"></div>
         <div class="stage-tools">
           <button id="soundBtn" class="chip" type="button" aria-pressed="false">Sound off</button>
-          <label class="chip">
-            Play your own clip
-            <input id="clipIn" class="sr" type="file" accept="video/*" />
-          </label>
+          <button id="filmBtn" class="chip" type="button">Change film</button>
         </div>
       </section>
-
-      <div id="dock"></div>
 
       <aside id="panel">
         <header class="brand">
@@ -97,6 +92,22 @@
         </div>
       </aside>
     </div>
+    <dialog id="filmDlg" class="dlg">
+      <form id="filmForm" method="dialog" novalidate>
+        <h2>Change the film</h2>
+        <label for="ytIn">Paste a YouTube link to a trailer</label>
+        <div class="dlg-row">
+          <input id="ytIn" type="url" inputmode="url" placeholder="https://youtu.be/…" autocomplete="off" />
+          <button id="ytGo" class="dlg-go" type="submit" value="yt">Play it</button>
+        </div>
+        <p id="ytErr" class="dlg-err" hidden>That does not look like a YouTube video link.</p>
+        <label class="dlg-file">
+          Or play a video file from this device
+          <input id="clipIn" class="sr" type="file" accept="video/*" />
+        </label>
+        <button class="dlg-close" type="submit" value="cancel">Close</button>
+      </form>
+    </dialog>
     <div id="toast" class="toast" role="status"></div>
     <script type="module" src="/src/main.js"></script>
   </body>

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 
 const SEAT_BASE_WIDTH = 0.58;
 const COLORS = {
@@ -161,13 +162,22 @@ export class HallScene {
     this.tween = null;
     this.look = { yaw: 0, pitch: 0, yawOff: 0, pitchOff: 0 };
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    this.renderer.setClearColor('#050407', 1);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color('#050407');
+    // A second, DOM-based 3D layer sits behind the WebGL canvas. A YouTube player
+    // lives there, lined up with the cinema screen, and shows through a hole the
+    // screen mesh cuts in the canvas. Seats in front still cover it correctly.
+    this.css = new CSS3DRenderer();
+    this.css.domElement.className = 'css3d';
+    canvas.parentElement.insertBefore(this.css.domElement, canvas);
+    this.cssScene = new THREE.Scene();
+    this.embed = null;
+    addEventListener('message', (e) => this._onEmbedMessage(e));
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.05, 400);
     this.camera.rotation.order = 'YXZ';
 
@@ -234,10 +244,7 @@ export class HallScene {
     const { width: W, height: H, bottom: B } = def.screen;
     const screen = new THREE.Mesh(
       new THREE.PlaneGeometry(W, H),
-      new THREE.MeshBasicMaterial({
-        map: this.videoReady ? this._videoTexture(W / H) : this._stillTexture(W / H),
-        toneMapped: false,
-      })
+      this._screenMaterial(W / H)
     );
     screen.position.set(0, B + H / 2, 0);
     g.add(screen);
@@ -330,6 +337,7 @@ export class HallScene {
     g.add(glow, glow.target);
     this.glow = glow;
     this.screen = screen;
+    this._placeEmbed();
     const fill = new THREE.DirectionalLight('#c9b6ff', 0.9);
     fill.position.set(bounds.width * 0.4, bounds.height + 6, bounds.depth + 8);
     fill.target.position.set(0, 0, bounds.depth * 0.4);
@@ -413,8 +421,8 @@ export class HallScene {
     const cols = Math.max(3, Math.round(bounds.width / 4));
     const rowsN = Math.max(3, Math.round(bounds.depth / 4));
     const dots = new THREE.InstancedMesh(
-      new THREE.CircleGeometry(0.11, 12),
-      new THREE.MeshBasicMaterial({ color: '#8a735c' }),
+      new THREE.CircleGeometry(0.06, 12),
+      new THREE.MeshBasicMaterial({ color: '#6a5847' }),
       cols * rowsN
     );
     const m = new THREE.Matrix4();
@@ -479,12 +487,7 @@ export class HallScene {
     new THREE.TextureLoader().load(src, (tex) => {
       tex.colorSpace = THREE.SRGBColorSpace;
       this.poster = tex;
-      if (this.screen && !this.videoReady) {
-        const { width: W, height: H } = this.hall.def.screen;
-        this.screen.material.map?.dispose();
-        this.screen.material.map = this._stillTexture(W / H);
-        this.screen.material.needsUpdate = true;
-      }
+      if (!this.videoReady) this._refreshScreen();
     });
   }
 
@@ -502,7 +505,7 @@ export class HallScene {
     const v = document.createElement('video');
     v.src = src;
     v.loop = false; // looped by hand so it can skip opening title cards
-    v.muted = this.video ? this.video.muted : true;
+    v.muted = this.muted !== false;
     v.playsInline = true;
     v.preload = 'auto';
     this.video = v;
@@ -519,12 +522,8 @@ export class HallScene {
         if (startAt) v.currentTime = startAt;
         this.videoReady = true;
         v.play().catch(() => {});
-        if (this.screen) {
-          const { width: W, height: H } = this.hall.def.screen;
-          this.screen.material.map?.dispose();
-          this.screen.material.map = this._videoTexture(W / H);
-          this.screen.material.needsUpdate = true;
-        }
+        this.clearEmbed();
+        this._refreshScreen();
         resolve(true);
       }, { once: true });
       v.addEventListener('error', () => resolve(false), { once: true });
@@ -532,9 +531,101 @@ export class HallScene {
   }
 
   setMuted(muted) {
-    if (!this.video) return;
-    this.video.muted = muted;
-    if (this.video.paused) this.video.play().catch(() => {});
+    this.muted = muted;
+    if (this.embed) {
+      this._embedCommand(muted ? 'mute' : 'unMute');
+      this._embedCommand('playVideo');
+    } else if (this.video) {
+      this.video.muted = muted;
+      if (this.video.paused) this.video.play().catch(() => {});
+    }
+  }
+
+  // What the screen mesh shows: a hole for the YouTube player, the video, or a still.
+  _screenMaterial(aspect) {
+    if (this.embed) {
+      return new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, blending: THREE.NoBlending, toneMapped: false });
+    }
+    return new THREE.MeshBasicMaterial({
+      map: this.videoReady ? this._videoTexture(aspect) : this._stillTexture(aspect),
+      toneMapped: false,
+    });
+  }
+
+  _refreshScreen() {
+    if (!this.screen) return;
+    const { width: W, height: H } = this.hall.def.screen;
+    this.screen.material.map?.dispose();
+    this.screen.material.dispose();
+    this.screen.material = this._screenMaterial(W / H);
+    this._placeEmbed();
+  }
+
+  /** Play a YouTube video on the cinema screen through YouTube's own player. */
+  setEmbed(id) {
+    this.clearEmbed();
+    this.video?.pause();
+    this.videoReady = false;
+    const wrap = document.createElement('div');
+    wrap.className = 'yt-wrap';
+    wrap.style.backgroundImage = `url(https://i.ytimg.com/vi/${id}/hqdefault.jpg)`;
+    const frame = document.createElement('iframe');
+    const q = new URLSearchParams({
+      autoplay: 1, mute: this.muted === false ? 0 : 1, controls: 0, loop: 1, playlist: id, playsinline: 1,
+      rel: 0, modestbranding: 1, iv_load_policy: 3, cc_load_policy: 0, disablekb: 1, fs: 0, enablejsapi: 1, origin: location.origin,
+    });
+    frame.src = `https://www.youtube-nocookie.com/embed/${id}?${q}`;
+    frame.allow = 'autoplay; encrypted-media';
+    frame.title = 'Film playing on the cinema screen';
+    frame.tabIndex = -1;
+    frame.addEventListener('load', () => frame.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'nazara', channel: 'widget' }), '*'));
+    wrap.appendChild(frame);
+    const obj = new CSS3DObject(wrap);
+    this.cssScene.add(obj);
+    this.embed = { id, wrap, frame, obj };
+    this._refreshScreen();
+  }
+
+  clearEmbed() {
+    if (!this.embed) return;
+    this.cssScene.remove(this.embed.obj);
+    this.embed.wrap.remove();
+    this.embed = null;
+    this.css.render(this.cssScene, this.camera);
+  }
+
+  // Size and place the player so it fills this hall's screen, cropping a 16:9
+  // video top and bottom the way a wide screen would.
+  _placeEmbed() {
+    if (!this.embed || !this.hall) return;
+    const { width: W, height: H, bottom: B } = this.hall.def.screen;
+    const px = 1280;
+    const h = Math.round(px / (W / H));
+    const { wrap, frame, obj } = this.embed;
+    wrap.style.width = `${px}px`;
+    wrap.style.height = `${h}px`;
+    frame.style.width = `${px}px`;
+    frame.style.height = `${px * 9 / 16}px`;
+    frame.style.top = `${(h - px * 9 / 16) / 2}px`;
+    obj.position.set(0, B + H / 2, 0);
+    obj.scale.setScalar(W / px);
+  }
+
+  _embedCommand(func, args = []) {
+    this.embed?.frame.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+  }
+
+  _onEmbedMessage(e) {
+    if (!this.embed || e.source !== this.embed.frame.contentWindow) return;
+    let data;
+    try { data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
+    if (data?.event === 'onError') this.onEmbedError?.(data.info);
+    if (data?.event === 'onReady' || (data?.event === 'infoDelivery' && data.info?.playerState === 1 && !this.embed.playing)) {
+      // YouTube turns captions on for muted autoplay; a cinema screen should not show them.
+      this._embedCommand('unloadModule', ['captions']);
+      this._embedCommand('unloadModule', ['cc']);
+    }
+    if (data?.event === 'infoDelivery' && data.info?.playerState === 1) this.embed.playing = true;
   }
 
   // Crop the film to fill the screen shape, like a projectionist would.
@@ -547,6 +638,12 @@ export class HallScene {
 
   // The light the screen throws on the room follows what is playing.
   _sampleGlow(now) {
+    if (this.embed) {
+      // The player's pixels cannot be read, so the glow just breathes gently.
+      this._glowColor.setRGB(1, 0.92, 0.82);
+      this._glowLevel = 1.7 + 0.35 * Math.sin(now / 900) + 0.2 * Math.sin(now / 370);
+      return;
+    }
     if (!this.videoReady || now - this._probeAt < 110) return;
     this._probeAt = now;
     try {
@@ -612,6 +709,7 @@ export class HallScene {
     const r = this.canvas.parentElement.getBoundingClientRect();
     if (!r.width || !r.height) return;
     this.renderer.setSize(r.width, r.height, false);
+    this.css.setSize(r.width, r.height);
     this.camera.aspect = r.width / r.height;
     if (this.mode === 'seat' && !this.tween) this.camera.fov = this._seatFov();
     this.camera.updateProjectionMatrix();
@@ -672,6 +770,7 @@ export class HallScene {
     this.ambient.intensity = 0.85 + 0.85 * this.house;
     this.fill.intensity = 0.7 + 1.5 * this.house;
     this.renderer.render(this.scene, this.camera);
+    if (this.embed) this.css.render(this.cssScene, this.camera);
   }
 
   _bindPointer() {

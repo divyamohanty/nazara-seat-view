@@ -22,11 +22,13 @@ Two motion ideas are ported from [motion-primitives](https://github.com/ibelick/
 
 ## The film on the screen
 
-The screen plays the trailer for "Sintel" (© Blender Foundation, durian.blender.org), an open film released under CC BY 3.0, so it is free to show with credit. The light it throws on the seats follows the picture.
+The screen plays a real trailer through YouTube's own embedded player, so nothing is downloaded or re-hosted. The player sits in a DOM layer behind the WebGL canvas, lined up in 3D with the cinema screen, and shows through a hole the screen cuts in the canvas. Seats and walls in front of it still cover it correctly. It uses the `youtube-nocookie.com` embed.
 
-A still frame (`public/media/poster.jpg`) shows at once, so the screen is never blank while the video downloads. The app loops the brightest 18 seconds of the trailer.
+"Change film" takes any YouTube link, or a video file from your device (the file stays in your browser). `?yt=<link or id>` opens the page with a different trailer.
 
-"Play your own clip" swaps in any video file from your device. The file stays in your browser and is not uploaded. To change the default, replace `public/media/sintel-trailer.mp4` and the credit line in `src/main.js`.
+If YouTube cannot play a video here (some owners switch embedding off), the app falls back to the trailer for "Sintel" (© Blender Foundation, durian.blender.org, CC BY 3.0), which ships in `public/media/`. `?film=local` forces that.
+
+The default trailer is set by `DEFAULT_TRAILER` in `src/main.js`.
 
 ## Run it
 

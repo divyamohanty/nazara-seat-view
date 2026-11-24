@@ -150,15 +150,6 @@ function renderMap() {
   paintMap();
 }
 
-// On wide screens the map leaves the narrow panel and docks under the 3D view.
-const wide = matchMedia('(min-width: 1100px)');
-function placeMap() {
-  (wide.matches ? $('#dock') : $('#mapHome')).appendChild($('#mapbox'));
-  fitMap();
-  revealSeat();
-}
-wide.addEventListener('change', placeMap);
-
 // Size seats so the widest row fits. Seats never shrink below a size you can read
 // and tap; past that the map scrolls sideways and keeps your seat centred.
 function fitMap() {
@@ -166,16 +157,11 @@ function fitMap() {
   if (!hall) return;
   const room = $('.map-wrap').clientWidth - 22 - 36; // padding + row letters
   const min = matchMedia('(pointer: coarse)').matches || innerWidth < 600 ? 22 : 17;
-  let size = 26;
+  let size = 24;
   for (const row of hall.rows) {
     const units = row.seats.reduce((n, s) => n + (s.recliner ? 1.5 : 1), 0);
     const fixed = row.seats.length * 2 + row.aisles.length * 12;
     size = Math.min(size, Math.floor((room - fixed) / units));
-  }
-  // Docked under the 3D view, also try to fit the height so nothing scrolls.
-  if (wide.matches) {
-    const tall = innerHeight * 0.46 - 70 - hall.sections.length * 26;
-    size = Math.min(size, Math.floor(tall / hall.rows.length) - 2);
   }
   $('#map').style.setProperty('--s', `${Math.max(min, size)}px`);
 }
@@ -187,11 +173,6 @@ function revealSeat() {
   const b = btn.getBoundingClientRect();
   const w = wrap.getBoundingClientRect();
   if (wrap.scrollWidth > wrap.clientWidth) wrap.scrollLeft += b.left + b.width / 2 - (w.left + w.width / 2);
-  const dock = $('#dock');
-  if (dock.contains(wrap) && dock.scrollHeight > dock.clientHeight) {
-    const d = dock.getBoundingClientRect();
-    dock.scrollTop += b.top + b.height / 2 - (d.top + d.height / 2);
-  }
 }
 
 function paintMap() {
@@ -277,20 +258,38 @@ document.fonts?.ready.then(() => glideTo(tabs, tabs.querySelector('[aria-selecte
 
 // ---------- film on the screen ----------
 
-const DEFAULT_FILM = {
+// The default film is a trailer played through YouTube's own player.
+const DEFAULT_TRAILER = {
+  id: 's2i077OSnfo',
+  credit: 'Now playing: "BUNKER Official Trailer 2", streamed from YouTube (channel: ONE Media).',
+};
+// If YouTube cannot play here, fall back to an open film that ships with the app.
+const FALLBACK_FILM = {
   src: `${import.meta.env.BASE_URL}media/sintel-trailer.mp4`,
-  // Loop the brightest stretch of the trailer: its opening and closing titles are black.
-  startAt: 23,
-  endAt: 41.5,
   credit: 'Now playing: the trailer for "Sintel", © Blender Foundation, durian.blender.org, CC BY 3.0.',
 };
 
-async function playFilm(src, credit, startAt = 0, endAt = Infinity) {
-  const ok = await scene.setFilm(src, startAt, endAt);
-  const failed = src === DEFAULT_FILM.src ? 'The film did not load, so the screen is showing a still from it.' : 'That file would not play here. Try an MP4.';
-  $('#nowPlaying').textContent = ok ? credit : failed;
+function youtubeId(text) {
+  const m = String(text).trim().match(/(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/|\/live\/)([\w-]{11})/) || String(text).trim().match(/^([\w-]{11})$/);
+  return m ? m[1] : null;
+}
+
+function playTrailer(id, credit) {
+  scene.setEmbed(id);
+  $('#nowPlaying').textContent = credit || 'Now playing: a trailer streamed from YouTube.';
+}
+
+async function playFile(src, credit) {
+  const ok = await scene.setFilm(src);
+  if (ok) $('#nowPlaying').textContent = credit;
   return ok;
 }
+
+scene.onEmbedError = () => {
+  scene.clearEmbed();
+  scene.setPoster(`${import.meta.env.BASE_URL}media/poster.jpg`);
+  playFile(FALLBACK_FILM.src, `YouTube would not play that video here. ${FALLBACK_FILM.credit}`);
+};
 
 $('#soundBtn').addEventListener('click', (e) => {
   const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
@@ -299,26 +298,47 @@ $('#soundBtn').addEventListener('click', (e) => {
   scene.setMuted(!on);
 });
 
+const dlg = $('#filmDlg');
+$('#filmBtn').addEventListener('click', () => {
+  $('#ytErr').hidden = true;
+  dlg.showModal();
+});
+$('#filmForm').addEventListener('submit', (e) => {
+  if (e.submitter?.value !== 'yt') return;
+  const id = youtubeId($('#ytIn').value);
+  if (!id) {
+    e.preventDefault();
+    $('#ytErr').hidden = false;
+    return;
+  }
+  playTrailer(id);
+  $('#ytIn').value = '';
+});
+
 let clipUrl;
 $('#clipIn').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  dlg.close();
   const url = URL.createObjectURL(file);
-  if (await playFilm(url, `Now playing: ${file.name}, from your device. It is not uploaded anywhere.`)) {
+  if (await playFile(url, `Now playing: ${file.name}, from your device. It is not uploaded anywhere.`)) {
     if (clipUrl) URL.revokeObjectURL(clipUrl);
     clipUrl = url;
   } else {
     URL.revokeObjectURL(url);
-    playFilm(DEFAULT_FILM.src, DEFAULT_FILM.credit, DEFAULT_FILM.startAt, DEFAULT_FILM.endAt);
+    $('#nowPlaying').textContent = 'That file would not play here. Try an MP4.';
   }
   e.target.value = '';
 });
 
-scene.setPoster(`${import.meta.env.BASE_URL}media/poster.jpg`);
-playFilm(DEFAULT_FILM.src, DEFAULT_FILM.credit, DEFAULT_FILM.startAt, DEFAULT_FILM.endAt);
+// ?yt=<link or id> opens with a different trailer; ?film=local uses the bundled open film.
+if (params.get('film') === 'local') {
+  scene.setPoster(`${import.meta.env.BASE_URL}media/poster.jpg`);
+  playFile(FALLBACK_FILM.src, FALLBACK_FILM.credit);
+} else if (youtubeId(params.get('yt') || '')) playTrailer(youtubeId(params.get('yt')));
+else playTrailer(DEFAULT_TRAILER.id, DEFAULT_TRAILER.credit);
 
 // Deep link for sharing a view: ?hall=single&seat=K12&view=hall
-placeMap();
 const startHall = Math.max(0, HALLS.findIndex((h) => h.id === params.get('hall')));
 openHall(startHall, !params.has('seat') && !params.has('view'));
 const wanted = state.hall.seats.find((s) => s.id === (params.get('seat') || '').toUpperCase() && !s.sold);
