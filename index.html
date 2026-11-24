@@ -3,22 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b090d" />
+    <meta name="theme-color" content="#120911" />
+    <meta name="description" content="See the view from your seat before you book. A 3D seat preview for Indian cinema halls." />
     <link rel="icon" href="data:," />
-    <title>Nazara — see the view before you book</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Hind:wght@400;500;600&family=Rozha+One&display=swap" rel="stylesheet" />
+    <title>Nazara: see the view before you book</title>
   </head>
   <body>
     <div id="app">
       <section id="stage">
         <canvas id="c" aria-label="3D view of the cinema hall"></canvas>
         <div class="topbar">
-          <button id="modeBtn" class="chip-btn" type="button"></button>
-          <div id="viewPill" class="pill"><i></i><span></span></div>
+          <button id="modeBtn" class="chip" type="button"></button>
+          <div id="viewPill" class="chip is-label"><i></i><span></span></div>
         </div>
         <div id="hint" class="hint"></div>
         <div class="stage-tools">
-          <button id="soundBtn" class="chip-btn" type="button" aria-pressed="false">Sound off</button>
-          <label class="chip-btn">
+          <button id="soundBtn" class="chip" type="button" aria-pressed="false">Sound off</button>
+          <label class="chip">
             Play your own clip
             <input id="clipIn" class="sr" type="file" accept="video/*" />
           </label>
@@ -27,49 +31,49 @@
 
       <aside id="panel">
         <header class="brand">
-          <div>
-            <h1>Nazara</h1>
-            <p>See the view before you book</p>
-          </div>
-          <label class="hall-pick">
-            <span class="sr">Hall</span>
-            <select id="hallSel"></select>
-          </label>
+          <h1>Nazara <span lang="hi">नज़ारा</span></h1>
+          <p>See the view before you book.</p>
         </header>
 
-        <div class="seat-card">
-          <div>
-            <div id="verdict" class="verdict"></div>
-            <h2 id="seatName"></h2>
-            <p id="seatClass" class="muted"></p>
+        <div id="halls" class="tabs" role="tablist" aria-label="Type of hall"><span class="glide"></span></div>
+
+        <article id="ticket" class="ticket" aria-live="polite">
+          <div class="t-main">
+            <div class="t-top"><span id="tClass"></span><span id="tPrice"></span></div>
+            <div class="t-seat"><span id="tRow"></span><span id="tNum"></span></div>
+            <p id="tWhere"></p>
+            <div id="verdict" class="stamp"></div>
           </div>
-          <div class="score"><b id="score"></b><span>view score</span></div>
-        </div>
+          <div class="t-stub">
+            <span>View</span>
+            <b id="score"></b>
+            <span>out of 100</span>
+          </div>
+        </article>
 
-        <div id="stats" class="stats"></div>
+        <dl id="stats" class="facts"></dl>
 
-        <div class="tools">
-          <button id="heatBtn" class="toggle" type="button" aria-pressed="false">
-            <i></i> Colour seats by view quality
-          </button>
-        </div>
+        <button id="heatBtn" class="toggle" type="button" aria-pressed="false">
+          <i></i> Colour every seat by its view
+        </button>
 
-        <h3>Best available</h3>
-        <div id="best" class="best"></div>
+        <h2>Best open seat in each class</h2>
+        <div id="best" class="best"><span class="glide"></span></div>
 
-        <h3>Pick a seat</h3>
+        <h2>Pick a seat</h2>
         <div class="map-wrap">
           <div id="map" class="map"></div>
         </div>
         <div id="legend" class="legend"></div>
 
-        <p id="blurb" class="blurb"></p>
-        <p id="nowPlaying" class="note"></p>
-        <p class="note">
-          Sample halls for the prototype. Layouts are typical of each format, not measurements of a real cinema.
+        <p id="blurb" class="small"></p>
+        <p id="nowPlaying" class="small"></p>
+        <p class="small">
+          These are sample halls. The layouts are typical of each format, not measurements of a real cinema.
         </p>
 
         <div class="bookbar">
+          <div class="pblur" aria-hidden="true"></div>
           <button id="bookBtn" class="book" type="button"></button>
         </div>
       </aside>

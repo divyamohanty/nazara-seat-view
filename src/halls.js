@@ -14,7 +14,8 @@ export const HALLS = [
   {
     id: 'multiplex',
     name: 'City multiplex',
-    sub: 'Screen 3 · 2K laser · Dolby 7.1',
+    tab: 'Multiplex',
+    sub: 'Screen 3, 2K laser projection',
     blurb: 'The standard mall multiplex screen: stadium seating, recliners in the last rows.',
     screen: { width: 12, height: 5.0, bottom: 1.8 },
     idealFov: [38, 58],
@@ -28,7 +29,8 @@ export const HALLS = [
   {
     id: 'single',
     name: 'Single screen',
-    sub: '70mm · stalls + balcony',
+    tab: 'Single screen',
+    sub: '70mm, stalls and a balcony',
     blurb: 'The classic big-town talkies: a long, gently sloped stalls floor and a raised balcony.',
     screen: { width: 18, height: 7.6, bottom: 2.4 },
     idealFov: [32, 50],
@@ -42,7 +44,8 @@ export const HALLS = [
   {
     id: 'large',
     name: 'Large format',
-    sub: 'Giant screen · 4K dual laser',
+    tab: 'Large format',
+    sub: 'Giant screen, 4K dual laser',
     blurb: 'A wall-to-wall tall screen with a steep rake. Built to fill your vision, so sitting further back helps.',
     screen: { width: 22, height: 11.6, bottom: 1.2 },
     idealFov: [55, 78],

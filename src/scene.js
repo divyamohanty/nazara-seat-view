@@ -8,7 +8,7 @@ const COLORS = {
   seat: new THREE.Color('#8f1626'),
   recliner: new THREE.Color('#6d1838'),
   sold: new THREE.Color('#2b2530'),
-  selected: new THREE.Color('#3fe08f'),
+  selected: new THREE.Color('#fff1c9'),
 };
 
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -258,7 +258,7 @@ export class HallScene {
     // Selected-seat marker for hall view.
     const beam = new THREE.Mesh(
       new THREE.CylinderGeometry(0.035, 0.035, 2.6, 12),
-      new THREE.MeshBasicMaterial({ color: '#3fe08f', transparent: true, opacity: 0.55 })
+      new THREE.MeshBasicMaterial({ color: '#fff1c9', transparent: true, opacity: 0.6 })
     );
     beam.visible = false;
     this.beam = beam;
@@ -456,6 +456,7 @@ export class HallScene {
   }
 
   _fly(pos, quat, fov, ms, done) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) ms = 0;
     if (!ms) {
       this.tween = null;
       this.camera.position.copy(pos);
