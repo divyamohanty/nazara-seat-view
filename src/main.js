@@ -207,7 +207,7 @@ $('#bookBtn').addEventListener('click', () => {
 // ---------- film on the screen ----------
 
 const DEFAULT_FILM = {
-  src: '/media/sintel-trailer.mp4',
+  src: `${import.meta.env.BASE_URL}media/sintel-trailer.mp4`,
   startAt: 12.5, // skip the black title cards
   credit: 'Now playing: "Sintel" trailer. © Blender Foundation, durian.blender.org, CC BY 3.0.',
 };

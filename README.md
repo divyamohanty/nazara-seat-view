@@ -4,6 +4,8 @@ See the view from your seat before you book. A working prototype of a 3D seat-pr
 
 "Nazara" (नज़ारा) means "the view".
 
+**Live demo:** https://divyamohanty.github.io/nazara-seat-view/
+
 ## What it does
 
 - Renders the hall in 3D and puts the camera in any seat, so you see how big the screen looks and what is in front of you.
@@ -26,6 +28,8 @@ npm run dev
 ```
 
 Then open the address it prints. To try it on your phone on the same Wi-Fi, run `npm run dev -- --host` and open the "Network" address.
+
+`npm run deploy` rebuilds the site and publishes it to GitHub Pages (the `gh-pages` branch).
 
 Links can open a specific view: `?hall=single&seat=H15`, `?hall=large&view=hall&heat=1`.
 
