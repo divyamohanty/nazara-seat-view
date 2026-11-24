@@ -11,18 +11,20 @@ See the view from your seat before you book. A working prototype of a 3D seat-pr
 - Renders the hall in 3D and puts the camera in any seat, so you see how big the screen looks and what is in front of you.
 - Scores every seat out of 100 on three things: how much of your vision the screen fills, how far you tilt your neck, and how far off to the side you are.
 - Shows the best open seat in each price class, so you can compare a ₹180 Classic seat with a ₹260 Prime one.
-- Colours the whole hall by view quality with one switch.
+- Colours the whole hall by view quality. This is on when the page opens, so the good and bad seats are obvious straight away.
 - Three sample halls: a mall multiplex (Classic / Prime / Recliner), an old single screen (Front Stalls / Rear Stalls / Balcony), and a large-format giant screen.
 
 ## The look
 
 The panel is built around an Indian cinema ticket: thin coloured paper with one colour per class (pink, yellow, green), a perforated stub that carries the view score, and a rubber-stamp verdict. The same three colours mark each class on the seat map. Type is Rozha One for the wordmark and seat numbers and Hind for everything else, both from the Indian Type Foundry and both with Devanagari.
 
-Three motion ideas are ported from [motion-primitives](https://github.com/ibelick/motion-primitives) (MIT) into plain JS in `src/motion.js`, since that kit is React and Tailwind: rolling digits on the score and stats, a highlight that glides between hall tabs and best-seat rows, and a progressive blur where the list slides under the Book button. Motion is switched off for people who ask their device for reduced motion.
+Two motion ideas are ported from [motion-primitives](https://github.com/ibelick/motion-primitives) (MIT) into plain JS in `src/motion.js`, since that kit is React and Tailwind: rolling digits on the score and stats, and a highlight that glides between hall tabs and best-seat rows. Motion is switched off for people who ask their device for reduced motion.
 
 ## The film on the screen
 
 The screen plays the trailer for "Sintel" (© Blender Foundation, durian.blender.org), an open film released under CC BY 3.0, so it is free to show with credit. The light it throws on the seats follows the picture.
+
+A still frame (`public/media/poster.jpg`) shows at once, so the screen is never blank while the video downloads. The app loops the brightest 18 seconds of the trailer.
 
 "Play your own clip" swaps in any video file from your device. The file stays in your browser and is not uploaded. To change the default, replace `public/media/sintel-trailer.mp4` and the credit line in `src/main.js`.
 
@@ -62,5 +64,5 @@ Row A is the back row, as in most Indian halls. Letters I and O are skipped.
 - `src/halls.js` — hall data, seat layout, view maths
 - `src/scene.js` — the 3D hall (three.js), camera moves, seat picking
 - `src/main.js` — panel, seat map, controls
-- `src/motion.js` — rolling digits, gliding highlight, progressive blur
+- `src/motion.js` — rolling digits, gliding highlight
 - `src/style.css` — styles

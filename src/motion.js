@@ -1,5 +1,5 @@
-// Small vanilla ports of three ideas from motion-primitives (MIT, github.com/ibelick/motion-primitives):
-// sliding-number, animated-background and progressive-blur. That kit is React + Tailwind;
+// Small vanilla ports of two ideas from motion-primitives (MIT, github.com/ibelick/motion-primitives):
+// sliding-number and animated-background. That kit is React + Tailwind;
 // this app is plain JS, so the ideas are rebuilt here on CSS transitions.
 
 const DIGITS = '0123456789';
@@ -54,17 +54,5 @@ export function glideTo(container, target) {
   if (fresh) {
     glide.getBoundingClientRect();
     glide.style.transition = '';
-  }
-}
-
-/** Progressive blur: stacked layers, each blurring a little more than the last. */
-export function progressiveBlur(el, layers = 5, step = 1.4) {
-  const seg = 1 / (layers + 1);
-  for (let i = 0; i < layers; i++) {
-    const stops = [i, i + 1, i + 2, i + 3].map((n, k) => `rgba(0,0,0,${k === 1 || k === 2 ? 1 : 0}) ${n * seg * 100}%`);
-    const mask = `linear-gradient(180deg, ${stops.join(', ')})`;
-    const layer = document.createElement('div');
-    layer.style.cssText = `position:absolute;inset:0;-webkit-mask-image:${mask};mask-image:${mask};-webkit-backdrop-filter:blur(${(i + 1) * step}px);backdrop-filter:blur(${(i + 1) * step}px)`;
-    el.appendChild(layer);
   }
 }

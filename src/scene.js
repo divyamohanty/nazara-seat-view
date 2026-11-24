@@ -97,6 +97,60 @@ function filmFrame(aspect) {
   return tex;
 }
 
+// Crop a texture so it fills a screen of the given shape.
+function cover(tex, srcAspect, aspect) {
+  if (srcAspect > aspect) {
+    tex.repeat.set(aspect / srcAspect, 1);
+    tex.offset.set((1 - aspect / srcAspect) / 2, 0);
+  } else {
+    tex.repeat.set(1, srcAspect / aspect);
+    tex.offset.set(0, (1 - srcAspect / aspect) / 2);
+  }
+  return tex;
+}
+
+function canvasTexture(w, h, draw) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// Soft pool of light a wall lamp throws on the wall around it.
+const lampPool = () =>
+  canvasTexture(128, 256, (g, w, h) => {
+    const r = g.createRadialGradient(w / 2, h * 0.42, 2, w / 2, h * 0.42, h * 0.56);
+    r.addColorStop(0, 'rgba(255,196,128,0.95)');
+    r.addColorStop(0.25, 'rgba(255,170,96,0.4)');
+    r.addColorStop(1, 'rgba(255,150,80,0)');
+    g.fillStyle = r;
+    g.fillRect(0, 0, w, h);
+  });
+
+const curtainCloth = () =>
+  canvasTexture(256, 64, (g, w, h) => {
+    for (let x = 0; x < w; x++) {
+      const fold = 0.5 + 0.5 * Math.sin((x / w) * Math.PI * 2 * 9);
+      const v = Math.round(60 + 110 * fold * fold);
+      g.fillStyle = `rgb(${v},${Math.round(v * 0.1)},${Math.round(v * 0.18)})`;
+      g.fillRect(x, 0, 1, h);
+    }
+  });
+
+const exitSign = () =>
+  canvasTexture(256, 96, (g, w, h) => {
+    g.fillStyle = '#0c8a45';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = '#eafff2';
+    g.font = '700 58px Arial, Helvetica, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('EXIT', w / 2, h / 2 + 3);
+  });
+
 export class HallScene {
   constructor(canvas, { onPick } = {}) {
     this.canvas = canvas;
@@ -181,7 +235,7 @@ export class HallScene {
     const screen = new THREE.Mesh(
       new THREE.PlaneGeometry(W, H),
       new THREE.MeshBasicMaterial({
-        map: this.videoReady ? this._videoTexture(W / H) : filmFrame(W / H),
+        map: this.videoReady ? this._videoTexture(W / H) : this._stillTexture(W / H),
         toneMapped: false,
       })
     );
@@ -255,6 +309,8 @@ export class HallScene {
     lights.forEach((l, i) => lightMesh.setMatrixAt(i, m.compose(p.set(...l), q, s)));
     g.add(lightMesh);
 
+    this._dressRoom(g, hall);
+
     // Selected-seat marker for hall view.
     const beam = new THREE.Mesh(
       new THREE.CylinderGeometry(0.035, 0.035, 2.6, 12),
@@ -318,10 +374,130 @@ export class HallScene {
     this.seatMesh.instanceColor.needsUpdate = true;
   }
 
+  // Wall lamps, wall panels, ceiling lights, curtains and exit signs: the things
+  // that make a dark box read as a cinema when you look away from the screen.
+  _dressRoom(g, hall) {
+    const { def, rows, bounds } = hall;
+    const { width: W, height: H, bottom: B } = def.screen;
+    const half = bounds.width / 2;
+    const floorAt = (z) => {
+      let y = 0;
+      for (const r of rows) if (r.z <= z) y = Math.max(y, r.y);
+      return y;
+    };
+
+    // Wall lamps with a pool of light, and fabric panels between them.
+    const pool = lampPool();
+    const poolMat = new THREE.MeshBasicMaterial({ map: pool, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.55 });
+    const lampMat = new THREE.MeshBasicMaterial({ color: '#ffd9a8' });
+    const panelMat = new THREE.MeshStandardMaterial({ color: '#2a2033', roughness: 1 });
+    const spacing = 4.2;
+    const count = Math.max(2, Math.floor((bounds.depth - 4) / spacing));
+    for (let i = 0; i < count; i++) {
+      const z = 3.2 + i * spacing;
+      const y = floorAt(z) + 2.7;
+      for (const side of [-1, 1]) {
+        const x = side * (half - 0.03);
+        const glow = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 5.2), poolMat);
+        glow.position.set(x, y - 0.2, z);
+        glow.rotation.y = -side * Math.PI / 2;
+        const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.34, 0.16), lampMat);
+        lamp.position.set(side * (half - 0.06), y, z);
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(0.1, bounds.height, 0.7), panelMat);
+        panel.position.set(side * (half - 0.05), bounds.height / 2, z + spacing / 2);
+        g.add(glow, lamp, panel);
+      }
+    }
+
+    // Dim ceiling downlights.
+    const cols = Math.max(3, Math.round(bounds.width / 4));
+    const rowsN = Math.max(3, Math.round(bounds.depth / 4));
+    const dots = new THREE.InstancedMesh(
+      new THREE.CircleGeometry(0.11, 12),
+      new THREE.MeshBasicMaterial({ color: '#8a735c' }),
+      cols * rowsN
+    );
+    const m = new THREE.Matrix4();
+    const down = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
+    const one = new THREE.Vector3(1, 1, 1);
+    let n = 0;
+    for (let i = 0; i < cols; i++)
+      for (let j = 0; j < rowsN; j++) {
+        const x = -half + (bounds.width * (i + 0.5)) / cols;
+        const z = 2 + ((bounds.depth - 3) * (j + 0.5)) / rowsN;
+        dots.setMatrixAt(n++, m.compose(new THREE.Vector3(x, bounds.height - 0.02, z), down, one));
+      }
+    g.add(dots);
+
+    // Curtains beside the screen and a pelmet above it, where there is room.
+    const cloth = curtainCloth();
+    const side = half - W / 2 - 0.3;
+    const top = bounds.height - (B + H) - 0.3;
+    if (side > 0.5) {
+      for (const s of [-1, 1]) {
+        const t = cloth.clone();
+        t.wrapS = THREE.RepeatWrapping;
+        t.repeat.x = Math.max(0.3, side / 3);
+        const c = new THREE.Mesh(new THREE.PlaneGeometry(side, bounds.height), new THREE.MeshStandardMaterial({ map: t, roughness: 1 }));
+        c.position.set(s * (W / 2 + 0.3 + side / 2), bounds.height / 2, 0.06);
+        g.add(c);
+      }
+    }
+    if (top > 0.25) {
+      const t = cloth.clone();
+      t.wrapS = THREE.RepeatWrapping;
+      t.repeat.x = bounds.width / 3;
+      const pelmet = new THREE.Mesh(new THREE.PlaneGeometry(bounds.width - 0.04, top), new THREE.MeshStandardMaterial({ map: t, roughness: 1 }));
+      pelmet.position.set(0, bounds.height - top / 2, 0.1);
+      g.add(pelmet);
+    }
+    cloth.dispose();
+
+    // Exit signs over the doors beside the screen.
+    const sign = exitSign();
+    for (const s of [-1, 1]) {
+      const e = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.34), new THREE.MeshBasicMaterial({ map: sign, toneMapped: false }));
+      e.position.set(s * (half - 0.04), 2.75, 2.2);
+      e.rotation.y = -s * Math.PI / 2;
+      const door = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 2.3), new THREE.MeshStandardMaterial({ color: '#120c16', roughness: 1 }));
+      door.position.set(s * (half - 0.035), 1.15, 2.2);
+      door.rotation.y = -s * Math.PI / 2;
+      const halo = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.4, 2.2),
+        new THREE.MeshBasicMaterial({ map: pool, color: '#35ff8a', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.22 })
+      );
+      halo.position.set(s * (half - 0.03), 2.6, 2.2);
+      halo.rotation.y = -s * Math.PI / 2;
+      g.add(door, halo, e);
+    }
+  }
+
   // ---------- film ----------
 
+  /** A still frame shown at once, so the screen is never blank while the film loads. */
+  setPoster(src) {
+    new THREE.TextureLoader().load(src, (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      this.poster = tex;
+      if (this.screen && !this.videoReady) {
+        const { width: W, height: H } = this.hall.def.screen;
+        this.screen.material.map?.dispose();
+        this.screen.material.map = this._stillTexture(W / H);
+        this.screen.material.needsUpdate = true;
+      }
+    });
+  }
+
+  _stillTexture(aspect) {
+    if (!this.poster) return filmFrame(aspect);
+    const t = this.poster.clone();
+    t.needsUpdate = true;
+    return cover(t, this.poster.image.width / this.poster.image.height, aspect);
+  }
+
+
   /** Play a video file on the cinema screen. Falls back to the painted frame if it cannot load. */
-  setFilm(src, startAt = 0) {
+  setFilm(src, startAt = 0, endAt = Infinity) {
     this.video?.pause();
     const v = document.createElement('video');
     v.src = src;
@@ -331,10 +507,12 @@ export class HallScene {
     v.preload = 'auto';
     this.video = v;
     this.videoReady = false;
-    v.addEventListener('ended', () => {
+    const rewind = () => {
       v.currentTime = startAt;
       v.play().catch(() => {});
-    });
+    };
+    v.addEventListener('ended', rewind);
+    v.addEventListener('timeupdate', () => v.currentTime >= endAt && rewind());
     return new Promise((resolve) => {
       v.addEventListener('loadeddata', () => {
         if (this.video !== v) return;
@@ -364,15 +542,7 @@ export class HallScene {
     const v = this.video;
     const t = new THREE.VideoTexture(v);
     t.colorSpace = THREE.SRGBColorSpace;
-    const va = v.videoWidth / v.videoHeight || aspect;
-    if (va > aspect) {
-      t.repeat.set(aspect / va, 1);
-      t.offset.set((1 - aspect / va) / 2, 0);
-    } else {
-      t.repeat.set(1, va / aspect);
-      t.offset.set(0, (1 - va / aspect) / 2);
-    }
-    return t;
+    return cover(t, v.videoWidth / v.videoHeight || aspect, aspect);
   }
 
   // The light the screen throws on the room follows what is playing.
@@ -499,7 +669,7 @@ export class HallScene {
     this.glow.intensity += (this._glowLevel - this.glow.intensity) * Math.min(1, dt / 180);
     const want = this.mode === 'hall' ? 1 : 0;
     this.house += (want - this.house) * Math.min(1, dt / 350);
-    this.ambient.intensity = 0.5 + 1.1 * this.house;
+    this.ambient.intensity = 0.85 + 0.85 * this.house;
     this.fill.intensity = 0.7 + 1.5 * this.house;
     this.renderer.render(this.scene, this.camera);
   }
